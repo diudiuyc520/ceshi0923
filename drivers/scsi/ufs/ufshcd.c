@@ -3903,28 +3903,6 @@ static int ufshcd_queuecommand(struct Scsi_Host *host, struct scsi_cmnd *cmd)
 	if (ufshcd_is_hibern8_on_idle_allowed(hba))
 		WARN_ON(hba->hibern8_on_idle.state != HIBERN8_EXITED);
 
-#if defined(CONFIG_UFSFEATURE) && defined(CONFIG_UFSHPB)
-	add_tag = ufsf_hpb_prepare_pre_req(&hba->ufsf, cmd, lun);
-	if (add_tag == -EAGAIN) {
-		clear_bit_unlock(tag, &hba->lrb_in_use);
-		err = SCSI_MLQUEUE_HOST_BUSY;
-		ufshcd_release_all(hba);
-		goto out;
-	}
-
-	if (add_tag < 0) {
-		hba->lrb[tag].hpb_ctx_id = MAX_HPB_CONTEXT_ID;
-		goto send_orig_cmd;
-	}
-
-	add_lrbp = &hba->lrb[add_tag];
-
-	pre_req_err = ufsf_hpb_prepare_add_lrbp(&hba->ufsf, add_tag);
-	if (pre_req_err)
-		hba->lrb[tag].hpb_ctx_id = MAX_HPB_CONTEXT_ID;
-send_orig_cmd:
-#endif
-
 	/* IO svc time latency histogram */
 	if (hba != NULL && cmd->request != NULL) {
 		if (hba->latency_hist_enabled) {
@@ -6658,9 +6636,6 @@ static void __ufshcd_transfer_req_compl(struct ufs_hba *hba,
 			hba->ufs_stats.clk_rel.ctx = XFR_REQ_COMPL;
 			__ufshcd_release(hba, false);
 			__ufshcd_hibern8_release(hba, false);
-			if (cmd->request) {
-				ufshcd_pm_qos_put(hba);
-			}
 
 			req = cmd->request;
 			if (req) {
@@ -6740,7 +6715,6 @@ void ufshcd_abort_outstanding_transfer_requests(struct ufs_hba *hba, int result)
 				 * this must be called before calling
 				 * ->scsi_done() callback.
 				 */
-				ufshcd_pm_qos_put(hba);
 			}
 			/* Do not touch lrbp after scsi done */
 			cmd->scsi_done(cmd);
