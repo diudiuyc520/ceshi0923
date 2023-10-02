@@ -3293,7 +3293,6 @@ static int __init rcu_spawn_gp_kthread(void)
 	int kthread_prio_in = kthread_prio;
 	struct rcu_node *rnp;
 	struct rcu_state *rsp;
-	struct sched_param sp;
 	struct task_struct *t;
 
 	/* Force priority into range. */
@@ -3312,18 +3311,18 @@ static int __init rcu_spawn_gp_kthread(void)
 			 kthread_prio, kthread_prio_in);
 
 	rcu_scheduler_fully_active = 1;
-	t = kthread_create(rcu_gp_kthread, NULL, "%s", rcu_state.name);
-	if (WARN_ONCE(IS_ERR(t), "%s: Could not start grace-period kthread, OOM is now expected behavior\n", __func__))
-		return 0;
-	if (kthread_prio) {
-		sp.sched_priority = kthread_prio;
-		sched_setscheduler_nocheck(t, SCHED_FIFO, &sp);
+	for_each_rcu_flavor(rsp) {
+		t = kthread_create(rcu_gp_kthread, rsp, "%s", rsp->name);
+		BUG_ON(IS_ERR(t));
+		rnp = rcu_get_root(rsp);
+		raw_spin_lock_irqsave_rcu_node(rnp, flags);
+		rsp->gp_kthread = t;
+		if (kthread_prio) {
+			sched_set_fifo(t);
+		}
+		raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
+		wake_up_process(t);
 	}
-	rnp = rcu_get_root();
-	raw_spin_lock_irqsave_rcu_node(rnp, flags);
-	rcu_state.gp_kthread = t;
-	raw_spin_unlock_irqrestore_rcu_node(rnp, flags);
-	wake_up_process(t);
 	rcu_spawn_nocb_kthreads();
 	rcu_spawn_boost_kthreads();
 	rcu_spawn_core_kthreads();
