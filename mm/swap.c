@@ -361,40 +361,6 @@ static void __lru_cache_activate_page(struct page *page)
 	put_cpu_var(lru_add_pvec);
 }
 
-#ifdef CONFIG_LRU_GEN
-static void page_inc_refs(struct page *page)
-{
-	unsigned long new_flags, old_flags = READ_ONCE(page->flags);
-
-	if (PageUnevictable(page))
-		return;
-
-	if (!PageReferenced(page)) {
-		SetPageReferenced(page);
-		return;
-	}
-
-	if (!PageWorkingset(page)) {
-		SetPageWorkingset(page);
-		return;
-	}
-
-	/* see the comment on MAX_NR_TIERS */
-	do {
-		new_flags = old_flags & LRU_REFS_MASK;
-		if (new_flags == LRU_REFS_MASK)
-			break;
-
-		new_flags += BIT(LRU_REFS_PGOFF);
-		new_flags |= old_flags & ~LRU_REFS_MASK;
-	} while (!try_cmpxchg(&page->flags, &old_flags, new_flags));
-}
-#else
-static void page_inc_refs(struct page *page)
-{
-}
-#endif /* CONFIG_LRU_GEN */
-
 /*
  * Mark a page as having seen activity.
  *
@@ -408,12 +374,6 @@ static void page_inc_refs(struct page *page)
 void mark_page_accessed(struct page *page)
 {
 	page = compound_head(page);
-
-	if (lru_gen_enabled()) {
-		page_inc_refs(page);
-		return;
-	}
-
 	if (!PageActive(page) && !PageUnevictable(page) &&
 			PageReferenced(page)) {
 
@@ -441,11 +401,6 @@ EXPORT_SYMBOL(mark_page_accessed);
 static void __lru_cache_add(struct page *page)
 {
 	struct pagevec *pvec = &get_cpu_var(lru_add_pvec);
-
-	/* see the comment in lru_gen_add_page() */
-	if (lru_gen_enabled() && !PageUnevictable(page) && !PageActive(page) &&
-	    lru_gen_in_fault() && !(current->flags & PF_MEMALLOC))
-		SetPageActive(page);
 
 	get_page(page);
 	if (!pagevec_add(pvec, page) || PageCompound(page))
@@ -617,11 +572,12 @@ static void lru_deactivate_fn(struct page *page, struct lruvec *lruvec,
 {
 	if (PageLRU(page) && PageActive(page) && !PageUnevictable(page)) {
 		int file = page_is_file_cache(page);
+		int lru = page_lru_base_type(page);
 
-		del_page_from_lru_list(page, lruvec);
+		del_page_from_lru_list(page, lruvec, lru + LRU_ACTIVE);
 		ClearPageActive(page);
 		ClearPageReferenced(page);
-		add_page_to_lru_list(page, lruvec);
+		add_page_to_lru_list(page, lruvec, lru);
 
 		__count_vm_events(PGDEACTIVATE, hpage_nr_pages(page));
 		update_page_reclaim_stat(lruvec, file, 0);
