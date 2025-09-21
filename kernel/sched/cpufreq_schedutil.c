@@ -20,6 +20,15 @@
 #include <linux/binfmts.h>
 #include "sched.h"
 
+#ifndef CONFIG_STUNE_ASSIST
+static inline bool task_is_booster(struct task_struct *p)
+{
+	return false;
+}
+#else
+extern bool task_is_booster(struct task_struct *p);
+#endif
+
 #define SUGOV_KTHREAD_PRIORITY	50
 
 struct sugov_tunables {
