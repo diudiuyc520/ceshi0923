@@ -521,7 +521,7 @@ void schedtune_dequeue_task(struct task_struct *p, int cpu)
 	int idx;
 
 	if (unlikely(!schedtune_initialized))
-		return;
+	return;
 
 	/*
 	 * Boost group accouting is protected by a per-cpu lock and requires
@@ -699,12 +699,20 @@ static struct cftype files[] = {
 	{
 		.name = "sched_boost_no_override",
 		.read_u64 = sched_boost_override_read,
+#ifdef CONFIG_STUNE_ASSIST
 		.write_u64 = sched_boost_override_write_wrapper,
+#else
+		.write_u64 = sched_boost_override_write,
+#endif
 	},
 	{
 		.name = "colocate",
 		.read_u64 = sched_colocate_read,
+#ifdef CONFIG_STUNE_ASSIST
 		.write_u64 = sched_colocate_write_wrapper,
+#else
+		.write_u64 = sched_colocate_write,
+#endif
 	},
 #endif
 	{
@@ -713,7 +721,7 @@ static struct cftype files[] = {
 #ifdef CONFIG_STUNE_ASSIST
 		.write_s64 = boost_write_wrapper,
 #else
-		.write_u64 = boost_write,
+		.write_s64 = boost_write,
 #endif
 	},
 	{
@@ -722,7 +730,7 @@ static struct cftype files[] = {
 #ifdef CONFIG_STUNE_ASSIST
 		.write_u64 = prefer_idle_write_wrapper,
 #else
-		.write_u64 = prefer_idle,
+		.write_u64 = prefer_idle_write,
 #endif
 	},
 	{ }	/* terminate */
