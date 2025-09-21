@@ -317,30 +317,7 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 	return true;
 }
 
-#else
-
-static inline bool lru_gen_enabled(void)
-{
-	return false;
-}
-
-static inline bool lru_gen_in_fault(void)
-{
-	return false;
-}
-
-static inline bool lru_gen_add_page(struct lruvec *lruvec, struct page *page, bool reclaiming)
-{
-	return false;
-}
-
-static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bool reclaiming)
-{
-	return false;
-}
-
-#endif /* CONFIG_LRU_GEN */
-
+// ！！！将这两个参数的函数移到 CONFIG_LRU_GEN 内部 ！！！
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
@@ -375,4 +352,29 @@ static __always_inline void del_page_from_lru_list(struct page *page,
 	update_lru_size(lruvec, page_lru(page), page_zonenum(page),
 			-hpage_nr_pages(page));
 }
+
+#else
+
+static inline bool lru_gen_enabled(void)
+{
+	return false;
+}
+
+static inline bool lru_gen_in_fault(void)
+{
+	return false;
+}
+
+static inline bool lru_gen_add_page(struct lruvec *lruvec, struct page *page, bool reclaiming)
+{
+	return false;
+}
+
+static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bool reclaiming)
+{
+	return false;
+}
+
+#endif /* CONFIG_LRU_GEN */
+
 #endif
