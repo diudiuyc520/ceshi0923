@@ -1,7 +1,6 @@
 /* SPDX-License-Identifier: GPL-2.0 */
 #ifndef LINUX_MM_INLINE_H
 #define LINUX_MM_INLINE_H
-
 #include <linux/huge_mm.h>
 #include <linux/swap.h>
 
@@ -28,9 +27,7 @@ static __always_inline void __update_lru_size(struct lruvec *lruvec,
 				int nr_pages)
 {
 	struct pglist_data *pgdat = lruvec_pgdat(lruvec);
-
 	lockdep_assert_held(&pgdat->lru_lock);
-
 	__mod_node_page_state(pgdat, NR_LRU_BASE + lru, nr_pages);
 	__mod_zone_page_state(&pgdat->node_zones[zid],
 				NR_ZONE_LRU_BASE + lru, nr_pages);
@@ -46,6 +43,7 @@ static __always_inline void update_lru_size(struct lruvec *lruvec,
 #endif
 }
 
+/* 3个参数版本：保留原函数名，无修改 */
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -53,6 +51,7 @@ static __always_inline void add_page_to_lru_list(struct page *page,
 	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
+/* 3个参数版本：保留原函数名，无修改 */
 static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -60,6 +59,7 @@ static __always_inline void add_page_to_lru_list_tail(struct page *page,
 	list_add_tail(&page->lru, &lruvec->lists[lru]);
 }
 
+/* 3个参数版本：保留原函数名，无修改 */
 static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -89,13 +89,10 @@ static inline enum lru_list page_lru_base_type(struct page *page)
 static __always_inline void __clear_page_lru_flags(struct page *page)
 {
 	VM_BUG_ON_PAGE(!PageLRU(page), page);
-
 	__ClearPageLRU(page);
-
 	/* this shouldn't happen, so leave the flags to bad_page() */
 	if (PageActive(page) && PageUnevictable(page))
 		return;
-
 	__ClearPageActive(page);
 	__ClearPageUnevictable(page);
 }
@@ -110,9 +107,7 @@ static __always_inline void __clear_page_lru_flags(struct page *page)
 static __always_inline enum lru_list page_lru(struct page *page)
 {
 	enum lru_list lru;
-
 	VM_BUG_ON_PAGE(PageActive(page) && PageUnevictable(page), page);
-
 	if (PageUnevictable(page))
 		lru = LRU_UNEVICTABLE;
 	else {
@@ -125,19 +120,21 @@ static __always_inline enum lru_list page_lru(struct page *page)
 
 #define lru_to_page(head) (list_entry((head)->prev, struct page, lru))
 
-// ！！！首先定义两个参数的函数版本，用不同的名称 ！！！
+// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
 static __always_inline void __add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	add_page_to_lru_list(page, lruvec, page_lru(page));
 }
 
+// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
 static __always_inline void __add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
 	add_page_to_lru_list_tail(page, lruvec, page_lru(page));
 }
 
+// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
 static __always_inline void __del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
@@ -145,16 +142,13 @@ static __always_inline void __del_page_from_lru_list(struct page *page,
 }
 
 #ifdef CONFIG_LRU_GEN
-
 static inline bool lru_gen_enabled(void)
 {
 #ifdef CONFIG_LRU_GEN_ENABLED
 	DECLARE_STATIC_KEY_TRUE(lru_gen_caps[NR_LRU_GEN_CAPS]);
-
 	return static_branch_likely(&lru_gen_caps[LRU_GEN_CORE]);
 #else
 	DECLARE_STATIC_KEY_FALSE(lru_gen_caps[NR_LRU_GEN_CAPS]);
-
 	return static_branch_unlikely(&lru_gen_caps[LRU_GEN_CORE]);
 #endif
 }
@@ -177,7 +171,6 @@ static inline int lru_hist_from_seq(unsigned long seq)
 static inline int lru_tier_from_refs(int refs)
 {
 	VM_BUG_ON(refs > BIT(LRU_REFS_WIDTH));
-
 	/* see the comment on MAX_NR_TIERS */
 	return order_base_2(refs + 1);
 }
@@ -186,7 +179,6 @@ static inline int page_lru_refs(struct page *page)
 {
 	unsigned long flags = READ_ONCE(page->flags);
 	bool workingset = flags & BIT(PG_workingset);
-
 	/*
 	 * Return the number of accesses beyond PG_referenced, i.e., N-1 if the
 	 * total number of accesses is N>1, since N=0,1 both map to the first
@@ -199,16 +191,13 @@ static inline int page_lru_refs(struct page *page)
 static inline int page_lru_gen(struct page *page)
 {
 	unsigned long flags = READ_ONCE(page->flags);
-
 	return ((flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
 }
 
 static inline bool lru_gen_is_active(struct lruvec *lruvec, int gen)
 {
 	unsigned long max_seq = lruvec->lrugen.max_seq;
-
 	VM_BUG_ON(gen >= MAX_NR_GENS);
-
 	/* see the comment on MIN_NR_GENS */
 	return gen == lru_gen_from_seq(max_seq) || gen == lru_gen_from_seq(max_seq - 1);
 }
@@ -269,6 +258,7 @@ static inline bool lru_gen_add_page(struct lruvec *lruvec, struct page *page, bo
 
 	if (PageUnevictable(page) || !lrugen->enabled)
 		return false;
+
 	/*
 	 * There are three common cases for this page:
 	 * 1. If it's hot, e.g., freshly faulted in or previously hot and
@@ -289,13 +279,13 @@ static inline bool lru_gen_add_page(struct lruvec *lruvec, struct page *page, bo
 	do {
 		new_flags = old_flags = READ_ONCE(page->flags);
 		VM_BUG_ON_PAGE(new_flags & LRU_GEN_MASK, page);
-
 		/* see the comment on MIN_NR_GENS */
 		new_flags &= ~(LRU_GEN_MASK | BIT(PG_active));
 		new_flags |= (gen + 1UL) << LRU_GEN_PGOFF;
 	} while (cmpxchg(&page->flags, old_flags, new_flags) != old_flags);
 
 	lru_gen_update_size(lruvec, page, -1, gen);
+
 	/* for rotate_reclaimable_page() */
 	if (reclaiming)
 		list_add_tail(&page->lru, &lrugen->lists[gen][type][zone]);
@@ -314,15 +304,14 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 		new_flags = old_flags = READ_ONCE(page->flags);
 		if (!(new_flags & LRU_GEN_MASK))
 			return false;
-
 		VM_BUG_ON_PAGE(PageActive(page), page);
 		VM_BUG_ON_PAGE(PageUnevictable(page), page);
-
 		gen = ((new_flags & LRU_GEN_MASK) >> LRU_GEN_PGOFF) - 1;
-
 		new_flags &= ~LRU_GEN_MASK;
+
 		if (!(new_flags & BIT(PG_referenced)))
 			new_flags &= ~(LRU_REFS_MASK | (BIT(PG_referenced) | BIT(PG_workingset)));
+
 		/* for shrink_page_list() */
 		if (reclaiming)
 			new_flags &= ~(BIT(PG_referenced) | BIT(PG_reclaim));
@@ -336,37 +325,34 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 	return true;
 }
 
-// ！！！在 CONFIG_LRU_GEN 内部重新定义两个参数的函数 ！！！
-static __always_inline void add_page_to_lru_list(struct page *page,
+// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
+static __always_inline void __add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	enum lru_list lru = page_lru(page);
-
 	if (lru_gen_add_page(lruvec, page, false))
 		return;
-
 	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
 	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
-static __always_inline void add_page_to_lru_list_tail(struct page *page,
+// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
+static __always_inline void __add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
 	enum lru_list lru = page_lru(page);
-
 	if (lru_gen_add_page(lruvec, page, true))
 		return;
-
 	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
 	list_add_tail(&page->lru, &lruvec->lists[lru]);
 }
 
-static __always_inline void del_page_from_lru_list(struct page *page,
+// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
+static __always_inline void __del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	if (lru_gen_del_page(lruvec, page, false))
 		return;
-
 	list_del(&page->lru);
 	update_lru_size(lruvec, page_lru(page), page_zonenum(page),
 			-hpage_nr_pages(page));
@@ -394,20 +380,20 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 	return false;
 }
 
-// ！！！在 CONFIG_LRU_GEN 未启用时，使用默认的两个参数函数 ！！！
-static __always_inline void add_page_to_lru_list(struct page *page,
+// ！！！CONFIG_LRU_GEN未启用时：直接调用带__前缀的2参数函数，逻辑不变 ！！！
+static __always_inline void __add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	__add_page_to_lru_list(page, lruvec);
 }
 
-static __always_inline void add_page_to_lru_list_tail(struct page *page,
+static __always_inline void __add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
 	__add_page_to_lru_list_tail(page, lruvec);
 }
 
-static __always_inline void del_page_from_lru_list(struct page *page,
+static __always_inline void __del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	__del_page_from_lru_list(page, lruvec);
@@ -415,4 +401,4 @@ static __always_inline void del_page_from_lru_list(struct page *page,
 
 #endif /* CONFIG_LRU_GEN */
 
-#endif
+#endif /* LINUX_MM_INLINE_H */
