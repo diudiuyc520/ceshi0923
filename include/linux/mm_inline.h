@@ -43,7 +43,6 @@ static __always_inline void update_lru_size(struct lruvec *lruvec,
 #endif
 }
 
-/* 3个参数版本：保留原函数名，无修改 */
 static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -51,7 +50,6 @@ static __always_inline void add_page_to_lru_list(struct page *page,
 	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
-/* 3个参数版本：保留原函数名，无修改 */
 static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec, enum lru_list lru)
 {
@@ -120,27 +118,6 @@ static __always_inline enum lru_list page_lru(struct page *page)
 
 #define lru_to_page(head) (list_entry((head)->prev, struct page, lru))
 
-// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
-static __always_inline void __add_page_to_lru_list(struct page *page,
-				struct lruvec *lruvec)
-{
-	add_page_to_lru_list(page, lruvec, page_lru(page));
-}
-
-// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
-static __always_inline void __add_page_to_lru_list_tail(struct page *page,
-				struct lruvec *lruvec)
-{
-	add_page_to_lru_list_tail(page, lruvec, page_lru(page));
-}
-
-// ！！！2个参数版本：函数名添加__前缀，避免与3参数版本冲突 ！！！
-static __always_inline void __del_page_from_lru_list(struct page *page,
-				struct lruvec *lruvec)
-{
-	del_page_from_lru_list(page, lruvec, page_lru(page));
-}
-
 #ifdef CONFIG_LRU_GEN
 static inline bool lru_gen_enabled(void)
 {
@@ -208,7 +185,7 @@ static inline void lru_gen_update_size(struct lruvec *lruvec, struct page *page,
 	int type = page_is_file_cache(page);
 	int zone = page_zonenum(page);
 	int delta = hpage_nr_pages(page);
-	enum lru_list lru = type * LRU_INACTIVE_FILE;  // 修复拼写错误
+	enum lru_list lru = type * LRU_INACTIVE_FILE;
 	struct lru_gen_struct *lrugen = &lruvec->lrugen;
 
 	VM_BUG_ON(old_gen != -1 && old_gen >= MAX_NR_GENS);
@@ -325,8 +302,7 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 	return true;
 }
 
-// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
-static __always_inline void __add_page_to_lru_list(struct page *page,
+static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	enum lru_list lru = page_lru(page);
@@ -336,8 +312,7 @@ static __always_inline void __add_page_to_lru_list(struct page *page,
 	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
-// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
-static __always_inline void __add_page_to_lru_list_tail(struct page *page,
+static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
 	enum lru_list lru = page_lru(page);
@@ -347,8 +322,7 @@ static __always_inline void __add_page_to_lru_list_tail(struct page *page,
 	list_add_tail(&page->lru, &lruvec->lists[lru]);
 }
 
-// ！！！CONFIG_LRU_GEN启用时：调用带__前缀的2参数函数，避免冲突 ！！！
-static __always_inline void __del_page_from_lru_list(struct page *page,
+static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
 	if (lru_gen_del_page(lruvec, page, false))
@@ -380,23 +354,28 @@ static inline bool lru_gen_del_page(struct lruvec *lruvec, struct page *page, bo
 	return false;
 }
 
-// ！！！CONFIG_LRU_GEN未启用时：直接调用带__前缀的2参数函数，逻辑不变 ！！！
-static __always_inline void __add_page_to_lru_list(struct page *page,
+static __always_inline void add_page_to_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
-	__add_page_to_lru_list(page, lruvec);
+	enum lru_list lru = page_lru(page);
+	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
+	list_add(&page->lru, &lruvec->lists[lru]);
 }
 
-static __always_inline void __add_page_to_lru_list_tail(struct page *page,
+static __always_inline void add_page_to_lru_list_tail(struct page *page,
 				struct lruvec *lruvec)
 {
-	__add_page_to_lru_list_tail(page, lruvec);
+	enum lru_list lru = page_lru(page);
+	update_lru_size(lruvec, lru, page_zonenum(page), hpage_nr_pages(page));
+	list_add_tail(&page->lru, &lruvec->lists[lru]);
 }
 
-static __always_inline void __del_page_from_lru_list(struct page *page,
+static __always_inline void del_page_from_lru_list(struct page *page,
 				struct lruvec *lruvec)
 {
-	__del_page_from_lru_list(page, lruvec);
+	list_del(&page->lru);
+	update_lru_size(lruvec, page_lru(page), page_zonenum(page),
+			-hpage_nr_pages(page));
 }
 
 #endif /* CONFIG_LRU_GEN */
